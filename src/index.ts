@@ -16,6 +16,24 @@ app.use(express.json());
 // Routes
 app.use("/api/auth", authRoutes);
 
+import { authenticate, authorize, AuthRequest } from "./middleware/auth.middleware";
+
+// Protected route example
+app.get("/api/me", authenticate, (req: AuthRequest, res) => {
+  res.json({
+    message: "You are authenticated",
+    user: req.user,
+  });
+});
+
+// Admin only route example
+app.get("/api/admin-only", authenticate, authorize("ADMIN"), (req: AuthRequest, res) => {
+  res.json({
+    message: "Welcome Admin",
+    user: req.user,
+  });
+});
+
 // Test routes
 app.get("/", (req, res) => {
   res.json({
