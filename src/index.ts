@@ -1,18 +1,22 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-
-const { PrismaClient } = require("@prisma/client");
+import { PrismaClient } from "@prisma/client";
+import authRoutes from "./routes/auth.routes";
 
 dotenv.config();
 
 const app = express();
 const prisma = new PrismaClient();
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
+// Routes
+app.use("/api/auth", authRoutes);
+
+// Test routes
 app.get("/", (req, res) => {
   res.json({
     message: "Hardware POS API is running",
