@@ -19,7 +19,7 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
 
 export const getUser = async (req: AuthRequest, res: Response) => {
   try {
-    const user = await getUserById(req.params.id);
+    const user = await getUserById(String(req.params.id));
     res.json(user);
   } catch (error: any) {
     res.status(404).json({ message: error.message });
@@ -43,7 +43,7 @@ export const createNewUser = async (req: AuthRequest, res: Response) => {
 
 export const updateExistingUser = async (req: AuthRequest, res: Response) => {
   try {
-    const user = await updateUser(req.params.id, req.body);
+    const user = await updateUser(String(req.params.id), req.body);
     res.json(user);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -52,7 +52,7 @@ export const updateExistingUser = async (req: AuthRequest, res: Response) => {
 
 export const removeUser = async (req: AuthRequest, res: Response) => {
   try {
-    const result = await deleteUser(req.params.id);
+    const result = await deleteUser(String(req.params.id));
     res.json(result);
   } catch (error: any) {
     res.status(400).json({ message: error.message });

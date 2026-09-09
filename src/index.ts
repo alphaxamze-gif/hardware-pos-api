@@ -1,3 +1,4 @@
+import userRoutes from "./routes/user.routes";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -15,6 +16,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
 
 import { authenticate, authorize, AuthRequest } from "./middleware/auth.middleware";
 
