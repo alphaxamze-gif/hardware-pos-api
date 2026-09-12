@@ -33,3 +33,49 @@ model Category {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+enum Unit {
+  PIECE
+  BAG
+  KG
+  METER
+  FOOT
+  LITER
+  BOX
+  SET
+  TONNE
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  name          String
+  sku           String?  @unique
+  description   String?
+  categoryId    String
+  category      Category @relation(fields: [categoryId], references: [id])
+  
+  // Pricing
+  costPrice     Float    @default(0)      // Buying price
+  sellingPrice  Float                     // Selling price
+  
+  // Stock
+  currentStock  Float    @default(0)
+  minStockLevel Float    @default(0)      // For low stock alerts
+  
+  // Unit
+  unit          Unit     @default(PIECE)
+  
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  products    Product[]          // ← Add this line
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
