@@ -1,7 +1,8 @@
+import dotenv from "dotenv";
+import categoryRoutes from "./routes/category.routes";
 import userRoutes from "./routes/user.routes";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import authRoutes from "./routes/auth.routes";
 
@@ -17,6 +18,7 @@ app.use(express.json());
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/categories", categoryRoutes);
 
 import { authenticate, authorize, AuthRequest } from "./middleware/auth.middleware";
 
