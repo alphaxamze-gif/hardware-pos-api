@@ -13,6 +13,18 @@ enum Role {
   CASHIER
 }
 
+enum Unit {
+  PIECE
+  BAG
+  KG
+  METER
+  FOOT
+  LITER
+  BOX
+  SET
+  TONNE
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -26,26 +38,14 @@ model User {
 }
 
 model Category {
-  id          String   @id @default(cuid())
-  name        String   @unique
+  id          String    @id @default(cuid())
+  name        String    @unique
   description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean   @default(true)
+  products    Product[]          // ← this relation is important
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
-
-enum Unit {
-  PIECE
-  BAG
-  KG
-  METER
-  FOOT
-  LITER
-  BOX
-  SET
-  TONNE
-}
-
 model Product {
   id            String   @id @default(cuid())
   name          String
@@ -70,12 +70,3 @@ model Product {
   updatedAt     DateTime @updatedAt
 }
 
-model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  description String?
-  isActive    Boolean   @default(true)
-  products    Product[]          // ← Add this line
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-}
