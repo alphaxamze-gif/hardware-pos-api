@@ -6,6 +6,10 @@ import cors from "cors";
 import { PrismaClient } from "@prisma/client";
 import authRoutes from "./routes/auth.routes";
 import productRoutes from "./routes/product.routes";
+import customerRoutes from "./routes/customer.routes";
+import supplierRoutes from "./routes/supplier.routes";
+import purchaseRoutes from "./routes/purchase.routes";
+import saleRoutes from "./routes/sale.routes";
 dotenv.config();
 
 const app = express();
@@ -20,6 +24,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/customers", customerRoutes);
+app.use("/api/suppliers", supplierRoutes);
+app.use("/api/purchases", purchaseRoutes);
+app.use("/api/sales", saleRoutes);
 
 import { authenticate, authorize, AuthRequest } from "./middleware/auth.middleware";
 
