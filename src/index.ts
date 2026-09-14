@@ -10,6 +10,11 @@ import customerRoutes from "./routes/customer.routes";
 import supplierRoutes from "./routes/supplier.routes";
 import purchaseRoutes from "./routes/purchase.routes";
 import saleRoutes from "./routes/sale.routes";
+import paymentRoutes from "./routes/payment.routes";
+import expenseRoutes from "./routes/expense.routes";
+import dashboardRoutes from "./routes/dashboard.routes";
+import reminderRoutes from "./routes/reminder.routes";
+
 dotenv.config();
 
 const app = express();
@@ -28,6 +33,10 @@ app.use("/api/customers", customerRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/purchases", purchaseRoutes);
 app.use("/api/sales", saleRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/expenses", expenseRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/reminders", reminderRoutes);
 
 import { authenticate, authorize, AuthRequest } from "./middleware/auth.middleware";
 
