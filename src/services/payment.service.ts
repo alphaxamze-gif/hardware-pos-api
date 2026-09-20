@@ -54,25 +54,36 @@ export const createPayment = async (data: {
   }
 
   const payment = await prisma.$transaction(async (tx) => {
-    // Create the payment record
-    const newPayment = await tx.payment.create({
-      data: {
-        type: data.type,
-        amount: data.amount,
-        paymentMethod: data.paymentMethod || "CASH",
-        reference: data.reference,
-        notes: data.notes,
-        customerId: data.customerId,
-        supplierId: data.supplierId,
-      },
-      include: {
-        customer: true,
-        supplier: true,
-      },
-    });
-
-    // Update dues
     if (data.type === "CUSTOMER_PAYMENT" && data.customerId) {
+      const customer = await tx.customer.findUnique({
+        where: { id: data.customerId },
+      });
+
+      if (!customer) {
+        throw new Error("Customer not found");
+      }
+
+      if (data.amount > customer.currentDue) {
+        throw new Error(
+          `Payment amount (${data.amount}) exceeds outstanding customer due (${customer.currentDue}). Overpayment is not allowed.`
+        );
+      }
+
+      const newPayment = await tx.payment.create({
+        data: {
+          type: data.type,
+          amount: data.amount,
+          paymentMethod: data.paymentMethod || "CASH",
+          reference: data.reference,
+          notes: data.notes,
+          customerId: data.customerId,
+        },
+        include: {
+          customer: true,
+          supplier: true,
+        },
+      });
+
       await tx.customer.update({
         where: { id: data.customerId },
         data: {
@@ -81,9 +92,40 @@ export const createPayment = async (data: {
           },
         },
       });
+
+      return newPayment;
     }
 
     if (data.type === "SUPPLIER_PAYMENT" && data.supplierId) {
+      const supplier = await tx.supplier.findUnique({
+        where: { id: data.supplierId },
+      });
+
+      if (!supplier) {
+        throw new Error("Supplier not found");
+      }
+
+      if (data.amount > supplier.currentDue) {
+        throw new Error(
+          `Payment amount (${data.amount}) exceeds outstanding supplier due (${supplier.currentDue}). Overpayment is not allowed.`
+        );
+      }
+
+      const newPayment = await tx.payment.create({
+        data: {
+          type: data.type,
+          amount: data.amount,
+          paymentMethod: data.paymentMethod || "CASH",
+          reference: data.reference,
+          notes: data.notes,
+          supplierId: data.supplierId,
+        },
+        include: {
+          customer: true,
+          supplier: true,
+        },
+      });
+
       await tx.supplier.update({
         where: { id: data.supplierId },
         data: {
@@ -92,9 +134,11 @@ export const createPayment = async (data: {
           },
         },
       });
+
+      return newPayment;
     }
 
-    return newPayment;
+    throw new Error("Invalid payment type or missing party id");
   });
 
   return payment;

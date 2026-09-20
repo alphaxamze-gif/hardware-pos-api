@@ -2,6 +2,25 @@ import { PrismaClient, Unit } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+const PRODUCT_ALLOWED_UPDATE_FIELDS = [
+  "name",
+  "sku",
+  "description",
+  "categoryId",
+  "costPrice",
+  "sellingPrice",
+  "minStockLevel",
+  "unit",
+  "isActive",
+] as const;
+
+const PRODUCT_PROTECTED_FIELDS = [
+  "currentStock",
+  "id",
+  "createdAt",
+  "updatedAt",
+] as const;
+
 export const getAllProducts = async () => {
   return prisma.product.findMany({
     include: {
@@ -41,7 +60,6 @@ export const createProduct = async (data: {
   minStockLevel?: number;
   unit?: Unit;
 }) => {
-  // Check if category exists
   const category = await prisma.category.findUnique({
     where: { id: data.categoryId },
   });
@@ -70,16 +88,40 @@ export const createProduct = async (data: {
   });
 };
 
-export const updateProduct = async (id: string, data: any) => {
+export const updateProduct = async (id: string, data: Record<string, unknown>) => {
   const product = await prisma.product.findUnique({ where: { id } });
 
   if (!product) {
     throw new Error("Product not found");
   }
 
+  const incomingKeys = Object.keys(data);
+  const protectedPresent = incomingKeys.filter((key) =>
+    (PRODUCT_PROTECTED_FIELDS as readonly string[]).includes(key)
+  );
+
+  if (protectedPresent.length > 0) {
+    throw new Error(
+      `Cannot update protected field(s): ${protectedPresent.join(", ")}. currentStock is system-owned and changed only by purchases and sales.`
+    );
+  }
+
+  const updateData: Record<string, unknown> = {};
+  for (const key of PRODUCT_ALLOWED_UPDATE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
+      updateData[key] = data[key];
+    }
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    throw new Error(
+      "No valid fields to update. Allowed: name, sku, description, categoryId, costPrice, sellingPrice, minStockLevel, unit, isActive"
+    );
+  }
+
   return prisma.product.update({
     where: { id },
-    data,
+    data: updateData,
     include: {
       category: {
         select: { id: true, name: true },
