@@ -155,17 +155,8 @@ export const createSale = async (data: {
   return sale;
 };
 
-export const deleteSale = async (id: string) => {
-  const sale = await prisma.sale.findUnique({
-    where: { id },
-    include: { items: true },
-  });
-
-  if (!sale) {
-    throw new Error("Sale not found");
-  }
-
-  // Note: In a real system we would reverse stock and dues here
-  await prisma.sale.delete({ where: { id } });
-  return { message: "Sale deleted successfully" };
+export const deleteSale = async (_id: string) => {
+  throw new Error(
+    "Destructive deletion of sales is not supported. Void/reversal will be introduced later."
+  );
 };

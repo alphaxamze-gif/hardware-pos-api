@@ -100,14 +100,8 @@ export const createPayment = async (data: {
   return payment;
 };
 
-export const deletePayment = async (id: string) => {
-  const payment = await prisma.payment.findUnique({ where: { id } });
-
-  if (!payment) {
-    throw new Error("Payment not found");
-  }
-
-  // Note: In a full system we would reverse the due amount here
-  await prisma.payment.delete({ where: { id } });
-  return { message: "Payment deleted successfully" };
+export const deletePayment = async (_id: string) => {
+  throw new Error(
+    "Destructive deletion of payments is not supported. Reversal will be introduced later."
+  );
 };

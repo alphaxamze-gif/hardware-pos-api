@@ -133,17 +133,8 @@ export const createPurchase = async (data: {
   return purchase;
 };
 
-export const deletePurchase = async (id: string) => {
-  const purchase = await prisma.purchase.findUnique({
-    where: { id },
-    include: { items: true },
-  });
-
-  if (!purchase) {
-    throw new Error("Purchase not found");
-  }
-
-  // Optional: You can later add logic to reverse stock and supplier due
-  await prisma.purchase.delete({ where: { id } });
-  return { message: "Purchase deleted successfully" };
+export const deletePurchase = async (_id: string) => {
+  throw new Error(
+    "Destructive deletion of purchases is not supported. Void/reversal will be introduced later."
+  );
 };
