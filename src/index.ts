@@ -14,8 +14,14 @@ import paymentRoutes from "./routes/payment.routes";
 import expenseRoutes from "./routes/expense.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
 import reminderRoutes from "./routes/reminder.routes";
+import { authenticate, authorize, AuthRequest } from "./middleware/auth.middleware";
 
 dotenv.config();
+
+if (!process.env.JWT_SECRET) {
+  console.error("FATAL: JWT_SECRET is not set in environment variables.");
+  process.exit(1);
+}
 
 const app = express();
 const prisma = new PrismaClient();
@@ -38,8 +44,6 @@ app.use("/api/expenses", expenseRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/reminders", reminderRoutes);
 
-import { authenticate, authorize, AuthRequest } from "./middleware/auth.middleware";
-
 // Protected route example
 app.get("/api/me", authenticate, (req: AuthRequest, res) => {
   res.json({
@@ -56,7 +60,6 @@ app.get("/api/admin-only", authenticate, authorize("ADMIN"), (req: AuthRequest, 
   });
 });
 
-// Test routes
 app.get("/", (req, res) => {
   res.json({
     message: "Hardware POS API is running",
