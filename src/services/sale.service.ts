@@ -48,12 +48,17 @@ export const createSale = async (data: {
   taxAmount?: number;
   amountPaid?: number;
   paymentMethod?: PaymentMethod;
+  createdById: string;
   items: {
     productId: string;
     quantity: number;
     unitPrice: number;
   }[];
 }) => {
+  if (!data.createdById) {
+    throw new Error("createdById is required");
+  }
+
   if (!data.items || data.items.length === 0) {
     throw new Error("At least one item is required");
   }
@@ -66,7 +71,6 @@ export const createSale = async (data: {
     }
   }
 
-  // Calculate totals
   let subtotal = 0;
   const itemsData = data.items.map((item) => {
     const totalPrice = item.quantity * item.unitPrice;
@@ -119,6 +123,7 @@ export const createSale = async (data: {
         totalAmount,
         amountPaid,
         paymentMethod,
+        createdById: data.createdById,
         items: {
           create: itemsData,
         },

@@ -27,6 +27,12 @@ export const getSale = async (req: AuthRequest, res: Response) => {
 
 export const createNewSale = async (req: AuthRequest, res: Response) => {
   try {
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        message: "Authenticated user identity is required to create a sale",
+      });
+    }
+
     const {
       customerId,
       invoiceNumber,
@@ -51,6 +57,7 @@ export const createNewSale = async (req: AuthRequest, res: Response) => {
       amountPaid,
       paymentMethod,
       items,
+      createdById: req.user.userId,
     });
 
     res.status(201).json(sale);
