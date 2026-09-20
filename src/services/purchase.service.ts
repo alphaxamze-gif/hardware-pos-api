@@ -51,7 +51,6 @@ export const createPurchase = async (data: {
     unitCost: number;
   }[];
 }) => {
-  // Validate supplier
   const supplier = await prisma.supplier.findUnique({
     where: { id: data.supplierId },
   });
@@ -63,7 +62,14 @@ export const createPurchase = async (data: {
     throw new Error("At least one item is required");
   }
 
-  // Calculate totals
+  for (const item of data.items) {
+    if (item.quantity == null || item.quantity <= 0) {
+      throw new Error(
+        `Purchase item quantity must be greater than 0 (productId: ${item.productId})`
+      );
+    }
+  }
+
   let totalAmount = 0;
   const itemsData = data.items.map((item) => {
     const totalCost = item.quantity * item.unitCost;
@@ -79,9 +85,23 @@ export const createPurchase = async (data: {
   const amountPaid = data.amountPaid || 0;
   const dueAmount = totalAmount - amountPaid;
 
-  // Use transaction so everything succeeds or fails together
   const purchase = await prisma.$transaction(async (tx) => {
-    // 1. Create the purchase
+    for (const item of data.items) {
+      const product = await tx.product.findUnique({
+        where: { id: item.productId },
+      });
+
+      if (!product) {
+        throw new Error(`Product not found: ${item.productId}`);
+      }
+
+      if (!product.isActive) {
+        throw new Error(
+          `Product is inactive and cannot be purchased: ${product.name}`
+        );
+      }
+    }
+
     const newPurchase = await tx.purchase.create({
       data: {
         supplierId: data.supplierId,
@@ -103,7 +123,6 @@ export const createPurchase = async (data: {
       },
     });
 
-    // 2. Increase stock for each product
     for (const item of data.items) {
       await tx.product.update({
         where: { id: item.productId },
@@ -115,7 +134,6 @@ export const createPurchase = async (data: {
       });
     }
 
-    // 3. Update supplier due if there is remaining balance
     if (dueAmount > 0) {
       await tx.supplier.update({
         where: { id: data.supplierId },

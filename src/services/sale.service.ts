@@ -58,6 +58,14 @@ export const createSale = async (data: {
     throw new Error("At least one item is required");
   }
 
+  for (const item of data.items) {
+    if (item.quantity == null || item.quantity <= 0) {
+      throw new Error(
+        `Sale item quantity must be greater than 0 (productId: ${item.productId})`
+      );
+    }
+  }
+
   // Calculate totals
   let subtotal = 0;
   const itemsData = data.items.map((item) => {
@@ -77,9 +85,7 @@ export const createSale = async (data: {
   const amountPaid = data.amountPaid || 0;
   const paymentMethod = data.paymentMethod || "CASH";
 
-  // Use transaction
   const sale = await prisma.$transaction(async (tx) => {
-    // 1. Check stock availability
     for (const item of data.items) {
       const product = await tx.product.findUnique({
         where: { id: item.productId },
@@ -89,6 +95,12 @@ export const createSale = async (data: {
         throw new Error(`Product not found: ${item.productId}`);
       }
 
+      if (!product.isActive) {
+        throw new Error(
+          `Product is inactive and cannot be sold: ${product.name}`
+        );
+      }
+
       if (product.currentStock < item.quantity) {
         throw new Error(
           `Insufficient stock for ${product.name}. Available: ${product.currentStock}`
@@ -96,7 +108,6 @@ export const createSale = async (data: {
       }
     }
 
-    // 2. Create the sale
     const newSale = await tx.sale.create({
       data: {
         customerId: data.customerId,
@@ -122,7 +133,6 @@ export const createSale = async (data: {
       },
     });
 
-    // 3. Reduce stock
     for (const item of data.items) {
       await tx.product.update({
         where: { id: item.productId },
@@ -134,7 +144,6 @@ export const createSale = async (data: {
       });
     }
 
-    // 4. If credit sale, increase customer due
     if (paymentMethod === "CREDIT" && data.customerId) {
       const dueAmount = totalAmount - amountPaid;
       if (dueAmount > 0) {

@@ -21,6 +21,15 @@ const PRODUCT_PROTECTED_FIELDS = [
   "updatedAt",
 ] as const;
 
+const assertNonNegative = (value: unknown, fieldName: string) => {
+  if (value === undefined || value === null) {
+    return;
+  }
+  if (typeof value !== "number" || Number.isNaN(value) || value < 0) {
+    throw new Error(`${fieldName} must be greater than or equal to 0`);
+  }
+};
+
 export const getAllProducts = async () => {
   return prisma.product.findMany({
     include: {
@@ -60,6 +69,11 @@ export const createProduct = async (data: {
   minStockLevel?: number;
   unit?: Unit;
 }) => {
+  assertNonNegative(data.currentStock, "currentStock");
+  assertNonNegative(data.sellingPrice, "sellingPrice");
+  assertNonNegative(data.costPrice, "costPrice");
+  assertNonNegative(data.minStockLevel, "minStockLevel");
+
   const category = await prisma.category.findUnique({
     where: { id: data.categoryId },
   });
@@ -104,6 +118,16 @@ export const updateProduct = async (id: string, data: Record<string, unknown>) =
     throw new Error(
       `Cannot update protected field(s): ${protectedPresent.join(", ")}. currentStock is system-owned and changed only by purchases and sales.`
     );
+  }
+
+  if (Object.prototype.hasOwnProperty.call(data, "sellingPrice")) {
+    assertNonNegative(data.sellingPrice, "sellingPrice");
+  }
+  if (Object.prototype.hasOwnProperty.call(data, "costPrice")) {
+    assertNonNegative(data.costPrice, "costPrice");
+  }
+  if (Object.prototype.hasOwnProperty.call(data, "minStockLevel")) {
+    assertNonNegative(data.minStockLevel, "minStockLevel");
   }
 
   const updateData: Record<string, unknown> = {};
