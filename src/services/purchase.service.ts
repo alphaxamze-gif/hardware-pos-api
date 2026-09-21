@@ -68,6 +68,11 @@ export const createPurchase = async (data: {
         `Purchase item quantity must be greater than 0 (productId: ${item.productId})`
       );
     }
+    if (item.unitCost == null || item.unitCost <= 0) {
+      throw new Error(
+        `Purchase item unitCost must be greater than 0 (productId: ${item.productId})`
+      );
+    }
   }
 
   let totalAmount = 0;
