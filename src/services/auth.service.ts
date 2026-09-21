@@ -21,13 +21,14 @@ export const registerUser = async (data: {
 
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
+  // Public registration always creates CASHIER — ignore client-supplied role
   const user = await prisma.user.create({
     data: {
       email: data.email,
       password: hashedPassword,
       firstName: data.firstName,
       lastName: data.lastName,
-      role: data.role || "CASHIER",
+      role: "CASHIER",
     },
   });
 

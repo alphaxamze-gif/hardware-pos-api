@@ -69,6 +69,11 @@ export const createSale = async (data: {
         `Sale item quantity must be greater than 0 (productId: ${item.productId})`
       );
     }
+    if (item.unitPrice == null || item.unitPrice <= 0) {
+      throw new Error(
+        `Sale item unitPrice must be greater than 0 (productId: ${item.productId})`
+      );
+    }
   }
 
   let subtotal = 0;
@@ -90,22 +95,32 @@ export const createSale = async (data: {
   const paymentMethod = data.paymentMethod || "CASH";
 
   const sale = await prisma.$transaction(async (tx) => {
+    // Atomic conditional stock reservation (concurrency-safe)
     for (const item of data.items) {
-      const product = await tx.product.findUnique({
-        where: { id: item.productId },
+      const updated = await tx.product.updateMany({
+        where: {
+          id: item.productId,
+          isActive: true,
+          currentStock: { gte: item.quantity },
+        },
+        data: {
+          currentStock: { decrement: item.quantity },
+        },
       });
 
-      if (!product) {
-        throw new Error(`Product not found: ${item.productId}`);
-      }
+      if (updated.count !== 1) {
+        const product = await tx.product.findUnique({
+          where: { id: item.productId },
+        });
 
-      if (!product.isActive) {
-        throw new Error(
-          `Product is inactive and cannot be sold: ${product.name}`
-        );
-      }
-
-      if (product.currentStock < item.quantity) {
+        if (!product) {
+          throw new Error(`Product not found: ${item.productId}`);
+        }
+        if (!product.isActive) {
+          throw new Error(
+            `Product is inactive and cannot be sold: ${product.name}`
+          );
+        }
         throw new Error(
           `Insufficient stock for ${product.name}. Available: ${product.currentStock}`
         );
@@ -137,17 +152,6 @@ export const createSale = async (data: {
         },
       },
     });
-
-    for (const item of data.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: {
-          currentStock: {
-            decrement: item.quantity,
-          },
-        },
-      });
-    }
 
     if (paymentMethod === "CREDIT" && data.customerId) {
       const dueAmount = totalAmount - amountPaid;
