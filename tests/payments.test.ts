@@ -83,4 +83,45 @@ describe("Payments", () => {
     const stillThere = await prisma.payment.findUnique({ where: { id: paymentId } });
     expect(stillThere).not.toBeNull();
   });
+
+  it("concurrent payments never collect more than outstanding due", async () => {
+    const customerId = fixtures.customerId;
+    const initialDue = (
+      await prisma.customer.findUnique({ where: { id: customerId } })
+    )!.currentDue as number;
+
+    const payload = {
+      type: "CUSTOMER_PAYMENT",
+      customerId,
+      amount: initialDue,
+      paymentMethod: "CASH",
+    };
+
+    const [r1, r2] = await Promise.all([
+      request(app)
+        .post("/api/payments")
+        .set("Authorization", `Bearer ${token}`)
+        .send(payload),
+      request(app)
+        .post("/api/payments")
+        .set("Authorization", `Bearer ${token}`)
+        .send(payload),
+    ]);
+
+    const statuses = [r1.status, r2.status].sort();
+    expect(statuses).toEqual([201, 400]);
+
+    const successAmount =
+      (r1.status === 201 ? initialDue : 0) +
+      (r2.status === 201 ? initialDue : 0);
+    expect(successAmount).toBeLessThanOrEqual(initialDue);
+
+    const finalDue = (
+      await prisma.customer.findUnique({ where: { id: customerId } })
+    )!.currentDue as number;
+    expect(finalDue).toBeGreaterThanOrEqual(0);
+    expect(finalDue).toBe(initialDue - successAmount);
+
+    expect(await prisma.payment.count()).toBe(1);
+  });
 });

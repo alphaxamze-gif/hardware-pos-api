@@ -115,6 +115,46 @@ describe("Sales", () => {
     expect(stockAfter).toBe(stockBefore);
   });
 
+  it("unitPrice 0 returns 400 and creates no sale", async () => {
+    const countBefore = await prisma.sale.count();
+    const res = await request(app)
+      .post("/api/sales")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        items: [
+          {
+            productId: fixtures.activeProductId,
+            quantity: 1,
+            unitPrice: 0,
+          },
+        ],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/unitPrice/i);
+    expect(await prisma.sale.count()).toBe(countBefore);
+  });
+
+  it("negative unitPrice returns 400 and creates no sale", async () => {
+    const countBefore = await prisma.sale.count();
+    const res = await request(app)
+      .post("/api/sales")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        items: [
+          {
+            productId: fixtures.activeProductId,
+            quantity: 1,
+            unitPrice: -10,
+          },
+        ],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/unitPrice/i);
+    expect(await prisma.sale.count()).toBe(countBefore);
+  });
+
   it("insufficient stock returns 400", async () => {
     const res = await request(app)
       .post("/api/sales")
@@ -177,5 +217,45 @@ describe("Sales", () => {
     expect(del.status).toBe(400);
     const stillThere = await prisma.sale.findUnique({ where: { id: saleId } });
     expect(stillThere).not.toBeNull();
+  });
+
+  it("concurrent sales never sell more than available stock", async () => {
+    const productId = fixtures.lowStockProductId;
+    const initial = (
+      await prisma.product.findUnique({ where: { id: productId } })
+    )!.currentStock as number;
+
+    const payload = {
+      paymentMethod: "CASH",
+      amountPaid: 80,
+      items: [{ productId, quantity: initial, unitPrice: 80 }],
+    };
+
+    const [r1, r2] = await Promise.all([
+      request(app)
+        .post("/api/sales")
+        .set("Authorization", `Bearer ${token}`)
+        .send(payload),
+      request(app)
+        .post("/api/sales")
+        .set("Authorization", `Bearer ${token}`)
+        .send(payload),
+    ]);
+
+    const statuses = [r1.status, r2.status].sort();
+    expect(statuses).toEqual([201, 400]);
+
+    const successQty =
+      (r1.status === 201 ? initial : 0) + (r2.status === 201 ? initial : 0);
+    expect(successQty).toBeLessThanOrEqual(initial);
+
+    const finalStock = (
+      await prisma.product.findUnique({ where: { id: productId } })
+    )!.currentStock as number;
+    expect(finalStock).toBeGreaterThanOrEqual(0);
+    expect(finalStock).toBe(initial - successQty);
+
+    const saleCount = await prisma.sale.count();
+    expect(saleCount).toBe(1);
   });
 });
