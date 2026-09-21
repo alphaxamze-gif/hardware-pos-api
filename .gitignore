@@ -36,3 +36,6 @@ coverage/
 
 # Misc
 *.tsbuildinfo
+
+.env
+.env.test
