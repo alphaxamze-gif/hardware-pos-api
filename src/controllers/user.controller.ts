@@ -34,7 +34,13 @@ export const createNewUser = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: "Required fields missing" });
     }
 
-    const user = await createUser({ email, password, firstName, lastName, role });
+    const user = await createUser({
+      email,
+      password,
+      firstName,
+      lastName,
+      role,
+    });
     res.status(201).json(user);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -43,7 +49,15 @@ export const createNewUser = async (req: AuthRequest, res: Response) => {
 
 export const updateExistingUser = async (req: AuthRequest, res: Response) => {
   try {
-    const user = await updateUser(String(req.params.id), req.body);
+    const { firstName, lastName, role, isActive, password } = req.body;
+
+    const user = await updateUser(String(req.params.id), {
+      firstName,
+      lastName,
+      role,
+      isActive,
+      password,
+    });
     res.json(user);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
