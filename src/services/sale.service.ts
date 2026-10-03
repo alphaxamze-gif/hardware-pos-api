@@ -93,8 +93,47 @@ export const createSale = async (data: {
   const totalAmount = subtotal - discount + taxAmount;
   const amountPaid = data.amountPaid || 0;
   const paymentMethod = data.paymentMethod || "CASH";
+  const dueAmount =
+    paymentMethod === "CREDIT" ? Math.max(0, totalAmount - amountPaid) : 0;
+
+  if (paymentMethod === "CREDIT") {
+    if (!data.customerId) {
+      throw new Error("Customer is required for credit sales");
+    }
+  }
 
   const sale = await prisma.$transaction(async (tx) => {
+    // Credit limit check (before stock moves or sale row)
+    if (paymentMethod === "CREDIT" && data.customerId && dueAmount > 0) {
+      const customer = await tx.customer.findUnique({
+        where: { id: data.customerId },
+      });
+
+      if (!customer) {
+        throw new Error("Customer not found");
+      }
+
+      if (customer.isActive === false) {
+        throw new Error(`Customer is inactive: ${customer.name}`);
+      }
+
+      const creditLimit = Number(customer.creditLimit) || 0;
+      const currentDue = Number(customer.currentDue) || 0;
+      const projectedDue = currentDue + dueAmount;
+
+      // creditLimit 0 = no credit allowed for unpaid balance
+      if (projectedDue > creditLimit) {
+        const available = Math.max(0, creditLimit - currentDue);
+        throw new Error(
+          `Credit limit exceeded for ${customer.name}. ` +
+            `Limit: KES ${creditLimit.toLocaleString()}, ` +
+            `current due: KES ${currentDue.toLocaleString()}, ` +
+            `this sale on account: KES ${dueAmount.toLocaleString()}, ` +
+            `available credit: KES ${available.toLocaleString()}.`
+        );
+      }
+    }
+
     // Atomic conditional stock reservation (concurrency-safe)
     for (const item of data.items) {
       const updated = await tx.product.updateMany({
@@ -153,18 +192,15 @@ export const createSale = async (data: {
       },
     });
 
-    if (paymentMethod === "CREDIT" && data.customerId) {
-      const dueAmount = totalAmount - amountPaid;
-      if (dueAmount > 0) {
-        await tx.customer.update({
-          where: { id: data.customerId },
-          data: {
-            currentDue: {
-              increment: dueAmount,
-            },
+    if (paymentMethod === "CREDIT" && data.customerId && dueAmount > 0) {
+      await tx.customer.update({
+        where: { id: data.customerId },
+        data: {
+          currentDue: {
+            increment: dueAmount,
           },
-        });
-      }
+        },
+      });
     }
 
     return newSale;
