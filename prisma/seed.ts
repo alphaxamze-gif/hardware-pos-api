@@ -1,14 +1,20 @@
 /**
  * Demo seed for Hardware PRO (local + Neon).
- * Run: npx ts-node prisma/seed.ts
- * Or:  npx prisma db seed  (after package.json prisma.seed is set)
+ * Run: npm run seed
  */
+import dotenv from "dotenv";
+dotenv.config();
+
 import { PrismaClient, Unit } from "@prisma/client";
 import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
 async function main() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is missing — check .env");
+  }
+
   const email = process.env.SEED_ADMIN_EMAIL || "admin@hardware.com";
   const password = process.env.SEED_ADMIN_PASSWORD || "Admin@123";
 
@@ -33,7 +39,7 @@ async function main() {
     },
   });
 
-  console.log(`Admin ready: ${admin.email} / (password from SEED_ADMIN_PASSWORD or Admin@123)`);
+  console.log(`Admin ready: ${admin.email}`);
 
   const categories = [
     { name: "Cement & binders", description: "Cement, lime, and bonding materials" },
