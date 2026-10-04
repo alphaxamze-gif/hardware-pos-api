@@ -38,6 +38,7 @@ export const createNewProduct = async (req: AuthRequest, res: Response) => {
       currentStock,
       minStockLevel,
       unit,
+      imageUrl,
     } = req.body;
 
     if (!name || !categoryId || sellingPrice === undefined) {
@@ -56,6 +57,7 @@ export const createNewProduct = async (req: AuthRequest, res: Response) => {
       currentStock,
       minStockLevel,
       unit,
+      imageUrl,
     });
 
     res.status(201).json(product);

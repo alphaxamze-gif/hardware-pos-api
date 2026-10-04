@@ -12,6 +12,7 @@ const PRODUCT_ALLOWED_UPDATE_FIELDS = [
   "minStockLevel",
   "unit",
   "isActive",
+  "imageUrl",
 ] as const;
 
 const PRODUCT_PROTECTED_FIELDS = [
@@ -28,6 +29,20 @@ const assertNonNegative = (value: unknown, fieldName: string) => {
   if (typeof value !== "number" || Number.isNaN(value) || value < 0) {
     throw new Error(`${fieldName} must be greater than or equal to 0`);
   }
+};
+
+const normalizeImageUrl = (value: unknown): string | null | undefined => {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value !== "string") {
+    throw new Error("imageUrl must be a string URL or empty");
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!/^https?:\/\//i.test(trimmed)) {
+    throw new Error("imageUrl must start with http:// or https://");
+  }
+  return trimmed;
 };
 
 export const getAllProducts = async () => {
@@ -68,11 +83,14 @@ export const createProduct = async (data: {
   currentStock?: number;
   minStockLevel?: number;
   unit?: Unit;
+  imageUrl?: string | null;
 }) => {
   assertNonNegative(data.currentStock, "currentStock");
   assertNonNegative(data.sellingPrice, "sellingPrice");
   assertNonNegative(data.costPrice, "costPrice");
   assertNonNegative(data.minStockLevel, "minStockLevel");
+
+  const imageUrl = normalizeImageUrl(data.imageUrl);
 
   const category = await prisma.category.findUnique({
     where: { id: data.categoryId },
@@ -97,6 +115,7 @@ export const createProduct = async (data: {
       currentStock: data.currentStock || 0,
       minStockLevel: data.minStockLevel || 0,
       unit: data.unit || "PIECE",
+      imageUrl: imageUrl ?? null,
     },
     include: {
       category: {
@@ -137,13 +156,17 @@ export const updateProduct = async (id: string, data: Record<string, unknown>) =
   const updateData: Record<string, unknown> = {};
   for (const key of PRODUCT_ALLOWED_UPDATE_FIELDS) {
     if (Object.prototype.hasOwnProperty.call(data, key)) {
-      updateData[key] = data[key];
+      if (key === "imageUrl") {
+        updateData.imageUrl = normalizeImageUrl(data.imageUrl);
+      } else {
+        updateData[key] = data[key];
+      }
     }
   }
 
   if (Object.keys(updateData).length === 0) {
     throw new Error(
-      "No valid fields to update. Allowed: name, sku, description, categoryId, costPrice, sellingPrice, minStockLevel, unit, isActive"
+      "No valid fields to update. Allowed: name, sku, description, categoryId, costPrice, sellingPrice, minStockLevel, unit, isActive, imageUrl"
     );
   }
 
@@ -158,10 +181,6 @@ export const updateProduct = async (id: string, data: Record<string, unknown>) =
   });
 };
 
-/**
- * Soft-delete: products referenced by PurchaseItem / SaleItem cannot be hard-deleted.
- * Sets isActive = false so history stays intact; inactive products cannot be sold.
- */
 export const deleteProduct = async (id: string) => {
   const product = await prisma.product.findUnique({ where: { id } });
 
