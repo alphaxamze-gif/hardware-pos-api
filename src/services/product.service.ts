@@ -45,6 +45,75 @@ const normalizeImageUrl = (value: unknown): string | null | undefined => {
   return trimmed;
 };
 
+/**
+ * Build a readable base code from the product name.
+ * Example: "Bamburi Cement 50kg" → "BAM-CEM-50KG"
+ */
+export const baseSkuFromName = (name: string): string => {
+  const cleaned = name
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const parts = cleaned.split(" ").filter(Boolean);
+  if (parts.length === 0) {
+    return "PRD";
+  }
+
+  const chunks: string[] = [];
+  for (const part of parts.slice(0, 4)) {
+    if (/^\d/.test(part)) {
+      chunks.push(part.slice(0, 8));
+    } else {
+      chunks.push(part.slice(0, 3));
+    }
+  }
+
+  return chunks.join("-").slice(0, 28);
+};
+
+/** Ensure uniqueness against existing Product.sku values. */
+const allocateUniqueSku = async (
+  preferred: string,
+  excludeProductId?: string
+): Promise<string> => {
+  let candidate = preferred;
+  let n = 1;
+
+  while (n < 1000) {
+    const existing = await prisma.product.findFirst({
+      where: {
+        sku: candidate,
+        ...(excludeProductId ? { id: { not: excludeProductId } } : {}),
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return candidate;
+    }
+
+    n += 1;
+    const suffix = `-${String(n).padStart(2, "0")}`;
+    candidate = `${preferred.slice(0, Math.max(1, 28 - suffix.length))}${suffix}`;
+  }
+
+  return `${preferred.slice(0, 20)}-${Date.now().toString(36).toUpperCase()}`;
+};
+
+const resolveSku = async (
+  name: string,
+  provided?: string | null
+): Promise<string> => {
+  const trimmed = provided?.trim();
+  if (trimmed) {
+    return allocateUniqueSku(trimmed.toUpperCase());
+  }
+  const base = baseSkuFromName(name);
+  return allocateUniqueSku(base);
+};
+
 export const getAllProducts = async () => {
   return prisma.product.findMany({
     include: {
@@ -104,10 +173,12 @@ export const createProduct = async (data: {
     throw new Error("Cannot add product to an inactive category");
   }
 
+  const sku = await resolveSku(data.name, data.sku);
+
   return prisma.product.create({
     data: {
       name: data.name,
-      sku: data.sku,
+      sku,
       description: data.description,
       categoryId: data.categoryId,
       costPrice: data.costPrice || 0,
@@ -161,6 +232,20 @@ export const updateProduct = async (id: string, data: Record<string, unknown>) =
       } else {
         updateData[key] = data[key];
       }
+    }
+  }
+
+  // Auto-SKU only when client clears sku or leaves it empty on update
+  if (Object.prototype.hasOwnProperty.call(updateData, "sku")) {
+    const raw = updateData.sku;
+    if (raw === null || raw === "" || (typeof raw === "string" && !raw.trim())) {
+      const nameForSku =
+        typeof updateData.name === "string" && updateData.name.trim()
+          ? updateData.name
+          : product.name;
+      updateData.sku = await resolveSku(nameForSku, null);
+    } else if (typeof raw === "string") {
+      updateData.sku = await allocateUniqueSku(raw.trim().toUpperCase(), id);
     }
   }
 
