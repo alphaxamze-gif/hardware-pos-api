@@ -89,6 +89,10 @@ export const updateCustomer = async (id: string, data: Record<string, unknown>) 
   });
 };
 
+/**
+ * Soft-delete: customers linked to Sale / Payment cannot be hard-deleted safely.
+ * Sets isActive = false. Due balance is preserved until paid.
+ */
 export const deleteCustomer = async (id: string) => {
   const customer = await prisma.customer.findUnique({ where: { id } });
 
@@ -96,6 +100,24 @@ export const deleteCustomer = async (id: string) => {
     throw new Error("Customer not found");
   }
 
-  await prisma.customer.delete({ where: { id } });
-  return { message: "Customer deleted successfully" };
+  if (customer.isActive === false) {
+    return {
+      message: "Customer is already inactive",
+      customer,
+    };
+  }
+
+  const deactivated = await prisma.customer.update({
+    where: { id },
+    data: { isActive: false },
+  });
+
+  const due = Number(customer.currentDue) || 0;
+  return {
+    message:
+      due > 0
+        ? `Customer deactivated. Outstanding due KES ${due.toLocaleString()} remains until paid.`
+        : "Customer deactivated. Sales and payment history are preserved.",
+    customer: deactivated,
+  };
 };
