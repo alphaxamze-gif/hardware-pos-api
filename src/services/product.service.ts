@@ -82,6 +82,10 @@ export const createProduct = async (data: {
     throw new Error("Category not found");
   }
 
+  if (category.isActive === false) {
+    throw new Error("Cannot add product to an inactive category");
+  }
+
   return prisma.product.create({
     data: {
       name: data.name,
@@ -154,6 +158,10 @@ export const updateProduct = async (id: string, data: Record<string, unknown>) =
   });
 };
 
+/**
+ * Soft-delete: products referenced by PurchaseItem / SaleItem cannot be hard-deleted.
+ * Sets isActive = false so history stays intact; inactive products cannot be sold.
+ */
 export const deleteProduct = async (id: string) => {
   const product = await prisma.product.findUnique({ where: { id } });
 
@@ -161,6 +169,26 @@ export const deleteProduct = async (id: string) => {
     throw new Error("Product not found");
   }
 
-  await prisma.product.delete({ where: { id } });
-  return { message: "Product deleted successfully" };
+  if (product.isActive === false) {
+    return {
+      message: "Product is already inactive",
+      product,
+    };
+  }
+
+  const deactivated = await prisma.product.update({
+    where: { id },
+    data: { isActive: false },
+    include: {
+      category: {
+        select: { id: true, name: true },
+      },
+    },
+  });
+
+  return {
+    message:
+      "Product deactivated. It remains in history (purchases/sales) but cannot be sold.",
+    product: deactivated,
+  };
 };
