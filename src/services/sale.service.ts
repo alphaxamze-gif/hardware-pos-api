@@ -1,6 +1,43 @@
-import { PrismaClient, PaymentMethod } from "@prisma/client";
+import { PrismaClient, PaymentMethod, Prisma } from "@prisma/client";
 
 const prisma = new PrismaClient();
+
+/**
+ * Next invoice number: INV-YYYY-00001
+ * Uses the highest existing number for the year inside the transaction.
+ * Client-supplied invoiceNumber is kept if non-empty.
+ */
+async function resolveInvoiceNumber(
+  tx: Prisma.TransactionClient,
+  provided?: string
+): Promise<string> {
+  const trimmed = provided?.trim();
+  if (trimmed) {
+    return trimmed;
+  }
+
+  const year = new Date().getFullYear();
+  const prefix = `INV-${year}-`;
+
+  const latest = await tx.sale.findFirst({
+    where: {
+      invoiceNumber: { startsWith: prefix },
+    },
+    orderBy: { invoiceNumber: "desc" },
+    select: { invoiceNumber: true },
+  });
+
+  let seq = 1;
+  if (latest?.invoiceNumber) {
+    const tail = latest.invoiceNumber.slice(prefix.length);
+    const parsed = parseInt(tail, 10);
+    if (!Number.isNaN(parsed) && parsed >= 0) {
+      seq = parsed + 1;
+    }
+  }
+
+  return `${prefix}${String(seq).padStart(5, "0")}`;
+}
 
 export const getAllSales = async () => {
   return prisma.sale.findMany({
@@ -103,7 +140,6 @@ export const createSale = async (data: {
   }
 
   const sale = await prisma.$transaction(async (tx) => {
-    // Credit limit check (before stock moves or sale row)
     if (paymentMethod === "CREDIT" && data.customerId && dueAmount > 0) {
       const customer = await tx.customer.findUnique({
         where: { id: data.customerId },
@@ -121,7 +157,6 @@ export const createSale = async (data: {
       const currentDue = Number(customer.currentDue) || 0;
       const projectedDue = currentDue + dueAmount;
 
-      // creditLimit 0 = no credit allowed for unpaid balance
       if (projectedDue > creditLimit) {
         const available = Math.max(0, creditLimit - currentDue);
         throw new Error(
@@ -134,7 +169,6 @@ export const createSale = async (data: {
       }
     }
 
-    // Atomic conditional stock reservation (concurrency-safe)
     for (const item of data.items) {
       const updated = await tx.product.updateMany({
         where: {
@@ -166,10 +200,12 @@ export const createSale = async (data: {
       }
     }
 
+    const invoiceNumber = await resolveInvoiceNumber(tx, data.invoiceNumber);
+
     const newSale = await tx.sale.create({
       data: {
         customerId: data.customerId,
-        invoiceNumber: data.invoiceNumber,
+        invoiceNumber,
         notes: data.notes,
         subtotal,
         discount,
